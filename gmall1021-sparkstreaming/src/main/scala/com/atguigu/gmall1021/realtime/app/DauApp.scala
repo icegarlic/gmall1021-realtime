@@ -19,11 +19,23 @@ object DauApp {
     // 1 sparkstreaming 要能够消费到kafka
     val sparkConf: SparkConf = new SparkConf().setAppName("dau_app").setMaster("local[4]")
     val ssc = new StreamingContext(sparkConf, Seconds(5))
+    /////////////////////
+    /// a 此处完成读取redis中的偏移量
+    ////////////////////
+
     // 2 通过 工具类 获得kafka数据流
     val topic = "ODS_BASE_LOG"
     val groupId = "dau_group"
+    /////////////////////
+    /// b 此处改造通过偏移量从指定位置消费kafka数据
+    ////////////////////
     val inputDstream: InputDStream[ConsumerRecord[String, String]] = MyKafkaUtil.getKafkaStream(topic, ssc, groupId)
     //    inputDstream.map(_.value()).print(100)
+
+
+    ////////////////////
+    /// c 此处在数据量转换前，得到偏移量的结束点
+    ///////////////////
 
     // 3 统计用户当日的首次访问 dau uv
     //    1 可以通过判断 日志中page 栏位是否last_page_id来决定该页面 --> 一次访问会话的首个页面
@@ -76,7 +88,7 @@ object DauApp {
 //      }
 //    }
 
-    val dauJsonDstream: DStream[JSONObject] = firstPageJsonDstream.mapPartitions { jsonItr =>
+    val dauDstream: DStream[JSONObject] = firstPageJsonDstream.mapPartitions { jsonItr =>
 
       val jedis = RedisUtil.getJedisClient // 转换成连接池连接，减少开辟连接的次数
       val dauList = new ListBuffer[JSONObject]
@@ -97,7 +109,10 @@ object DauApp {
 
     }
 
-    dauJsonDstream.print(1000)
+    dauDstream.print(1000)
+    ////////////////////////
+    /// d 此处把偏移量的结束点，更新到redis中，作为偏移量的提交
+    ////////////////////////
 
     ssc.start()
     ssc.awaitTermination()
