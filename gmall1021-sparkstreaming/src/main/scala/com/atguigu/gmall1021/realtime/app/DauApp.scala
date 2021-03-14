@@ -131,6 +131,7 @@ object DauApp {
     ////////////////////////
     dauDstream.foreachRDD { rdd =>
       rdd.foreachPartition { jsonObjItr =>
+        // 数据保存到es中 jsonObjItr代表了每个分区中的数据
         for (jsonObj <- jsonObjItr) {
           println(jsonObj)
           // 在ex执行，每条数据执行一次
