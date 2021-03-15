@@ -1,14 +1,14 @@
 package com.atguigu.gmall1021.realtime.app
 
 import com.alibaba.fastjson.{JSON, JSONObject}
-import com.atguigu.gmall1021.realtime.util.{MyKafkaUtil, OffsetManageUtil, RedisUtil}
+import com.atguigu.gmall1021.realtime.bean.DauInfo
+import com.atguigu.gmall1021.realtime.util.{MyEsUtil, MyKafkaUtil, OffsetManageUtil, RedisUtil}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
 import org.apache.spark.streaming.kafka010.{HasOffsetRanges, OffsetRange}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import redis.clients.jedis.Jedis
 
 import java.lang
 import java.text.SimpleDateFormat
@@ -16,6 +16,16 @@ import java.util.Date
 import scala.collection.mutable.ListBuffer
 
 object DauApp {
+
+  //  1 从redis 读取偏移量
+  //  2 按照偏移量kafka中加载数据流
+  //  3 从数据流中得到本批次的偏移量结束点，用于结束时提交偏移量
+  //  4 数据结构调整  把流中元素从record 调整为jsonObj
+  //  5 过滤 所有操作日志提取出“用户进入app的首个页面的动作”
+  //  6 去重 把”首次操作“ 变为 当日第一个首次操作 利用redis
+  //  7 保存数据 写入es中 转换格式，建立索引模板，幂等性处理，批量保存
+  //  8 提交偏移量
+
 
   def main(args: Array[String]): Unit = {
     // 1 sparkstreaming 要能够消费到kafka
@@ -129,17 +139,45 @@ object DauApp {
     ////////////////////////
     /// d 此处把偏移量的结束点，更新到redis中，作为偏移量的提交
     ////////////////////////
+
+    // 1 调整结构 按照需要的字段提取出来 样例类
+    // 2 批量且幂等性的保存到es中  批量bulk 幂等性加入id
+    // 3 后置提交偏移量
     dauDstream.foreachRDD { rdd =>
+
       rdd.foreachPartition { jsonObjItr =>
-        // 数据保存到es中 jsonObjItr代表了每个分区中的数据
-        for (jsonObj <- jsonObjItr) {
-          println(jsonObj)
-          // 在ex执行，每条数据执行一次
+        // 把数据保存到es中  jsonObjItr 代表了每个分区中的数据
+        val jsonObjList: List[JSONObject] = jsonObjItr.toList
+        if (jsonObjList != null && jsonObjList.size > 0) {
+          val dauWithIdList: List[(String, DauInfo)] = jsonObjList.map { jsonObj =>
+            val commonJsonObj: JSONObject = jsonObj.getJSONObject("common")
+            val dauInfo = DauInfo(commonJsonObj.getString("mid"),
+              commonJsonObj.getString("uid"),
+              commonJsonObj.getString("ar"),
+              commonJsonObj.getString("ch"),
+              commonJsonObj.getString("vc"),
+              jsonObj.getString("dt"),
+              jsonObj.getString("hr"),
+              jsonObj.getLong("ts")
+            )
+            (dauInfo.mid, dauInfo)
+          }
+          val indexName = "gmall1021_dau_info_" + dauWithIdList(0)._2.dt
+
+          //1 批量保存  2 保证数据保存时的幂等性= 相同内容的数据反复保存 不会重复  如何实现？
+          MyEsUtil.saveBulk(dauWithIdList, indexName)
         }
-        // 在ex执行，每个分区执行一次
+        //      for (jsonObj <- jsonObjItr ) {
+        //
+        //        println(jsonObj)
+        //        // a   dr? ex?   执行频率？1每条数据 ？2 每分区 3 每批次  4 只执行一次
+        //        //  ex 1
+        //      }
+        // b  // ex 2
       }
-      // 在dr执行，每个批次执行一次
-      OffsetManageUtil.saveOffset(topic, groupId, offsetRanges)
+      //c   //  dr  3
+      OffsetManageUtil.saveOffset(topic, groupId, offsetRanges) // 把偏移量的结束点保存到redis中  //dr 每批次 3
+      //   println("1111")
     }
     // 在dr执行，启动时执行一次
 

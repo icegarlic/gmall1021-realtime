@@ -55,7 +55,7 @@ object OffsetManageUtil {
     for (offsetRange <- offsetRanges) {
       val partition: Int = offsetRange.partition
       val untilOffset: Long = offsetRange.untilOffset
-      println("偏移量写入： 分区：" + partition + " 偏移量结束：" + untilOffset)
+//      println("偏移量写入： 分区：" + partition + " 偏移量结束：" + untilOffset)
       offsetMap.put(partition.toString, untilOffset.toString)
     }
     //2  存储到redis中
