@@ -15,5 +15,5 @@ public interface DauService {
      * @param date 日期
      * @return 明细 Map
      */
-    Map<String,String> getDauHourCount(String date);
+    Map<String,Long> getDauHourCount(String date);
 }
