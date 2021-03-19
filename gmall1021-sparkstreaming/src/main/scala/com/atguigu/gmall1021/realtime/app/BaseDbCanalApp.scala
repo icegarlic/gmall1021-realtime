@@ -1,13 +1,16 @@
 package com.atguigu.gmall1021.realtime.app
 
 import com.alibaba.fastjson.{JSON, JSONArray, JSONObject}
-import com.atguigu.gmall1021.realtime.util.{MyKafkaSender, MyKafkaUtil, OffsetManageUtil}
+import com.atguigu.gmall1021.realtime.util.{HbaseUtil, MyKafkaSender, MyKafkaUtil, OffsetManageUtil}
+import org.apache.commons.lang3.StringUtils
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
 import org.apache.spark.streaming.kafka010.{HasOffsetRanges, OffsetRange}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
+
+import java.lang
 
 object BaseDbCanalApp {
   //  1 从redis 读取偏移量
@@ -60,23 +63,36 @@ object BaseDbCanalApp {
       rdd.foreach { jsonObj =>
         // 判断数据属于维度还是事实
         val tableName: String = jsonObj.getString("table")
+        val jSONArray: JSONArray = jsonObj.getJSONArray("data") // 得到某个对象后转成JSONArray
+        val dataJsonObj: JSONObject = jSONArray.getJSONObject(0)
+        // 获得主键的名称
+        val pkName: String = jsonObj.getJSONArray("pkNames").getString(0)
+        val pk: lang.Long = dataJsonObj.getLong(pkName)
+
         if (factTableNames.contains(tableName)) {
-          // 事实数据 分表分类型 写入kafka主题
+          // 6.1 事实数据 分表分类型 写入kafka主题
           val optType: String = jsonObj.getString("type")
           val opt: String = optType.substring(0, 1)
-          val topicName: String = "DWD_" + tableName.toUpperCase + "_" + opt  //DWD_ORDER_INFO_I
-          val jSONArray: JSONArray = jsonObj.getJSONArray("data") // 得到某个对象后转成JSONArray
-          val dataJsonObj: JSONObject = jSONArray.getJSONObject(0)
+          val topicName: String = "DWD_" + tableName.toUpperCase + "_" + opt //DWD_ORDER_INFO_I
 
-          MyKafkaSender.send(topicName,dataJsonObj.toJSONString)
+          MyKafkaSender.send(topicName, dataJsonObj.toJSONString)
+        } else if (dimTableNames.contains(tableName)) {
+          // 6.2 维度数据 分表写入hbasae中
+          // 表名 tableName
+          // 生成rowkey  00-19 20-39 40-59
+          // 把顺序的序列进行反转
+          // 110001 110002  110003
+          var rowkey = StringUtils.leftPad(pk.toString, 10, "0").reverse
+          HbaseUtil.put(tableName, rowkey, dataJsonObj)
+          // 列名和列值 dataJsonObj
+
         }
+
+
       }
-      // 维度数据 分表写入hbase中
-    // 8 提交偏移量
+      // 8 提交偏移量
       OffsetManageUtil.saveOffset(topic, groupId, offsetRanges)
     }
-
-
 
 
     ssc.start()

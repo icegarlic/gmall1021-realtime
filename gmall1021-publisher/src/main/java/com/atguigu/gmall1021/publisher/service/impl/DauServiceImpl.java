@@ -24,6 +24,9 @@ public class DauServiceImpl implements DauService {
 
     final String INDEX_NAME_PREFIX = "gmall1021_dau_info_";
 
+    /*
+        查询3件事 1 构造查询条件 2 提交到数据库 3 提取查询结果
+     */
     @Override
     public Long getDauTotal(String date) {
         // 组织查询条件
