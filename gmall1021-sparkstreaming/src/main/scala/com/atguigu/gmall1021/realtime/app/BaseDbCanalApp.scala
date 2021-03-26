@@ -79,7 +79,7 @@ object BaseDbCanalApp {
           MyKafkaSender.send(topicName, dataJsonObj.toJSONString)
           //可以根据下游的业务操作 ，选择指定的分区键进行发送数据，减少下游shuffle操作的成本
           // MyKafkaSender.send(topicName,key,dataJsonObj.toJSONString)
-          // Thread.sleep(200)
+          //Thread.sleep(200)
         } else if (dimTableNames.contains(tableName)) {
           //6.2  维度数据  分表写入hbase中
           //表名 tableName    DIM_USER_INFO
