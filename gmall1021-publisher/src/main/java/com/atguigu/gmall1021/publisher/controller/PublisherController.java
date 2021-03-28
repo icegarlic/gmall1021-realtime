@@ -77,6 +77,14 @@ public class PublisherController {
                               @RequestParam("t") String type) {
         List<NameValue> nameValueList = orderAnalysisService.getStateByItem(itemName, date, type);
         return JSON.toJSONString(nameValueList);
+    }
 
+    @RequestMapping("/detailByItem")
+    public String detailByItem(@RequestParam("itemName") String itemName,
+                              @RequestParam("date") String date,
+                              @RequestParam("pageNo") Integer pageNo,
+                               @RequestParam("pageSize") Integer pageSize) {
+        Map detailByItemMap = orderAnalysisService.getDetailByItem(itemName, date, pageNo, pageSize);
+        return JSON.toJSONString(detailByItemMap);
     }
 }

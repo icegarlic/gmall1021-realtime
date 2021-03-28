@@ -10,12 +10,12 @@ import org.apache.spark.streaming.kafka010.{ConsumerStrategies, KafkaUtils, Loca
 import java.util.Properties
 
 object MyKafkaUtil {
-  private val properties: Properties =  PropertiesUtil.load("config.properties")
+  private val properties: Properties = PropertiesUtil.load("config.properties")
   val broker_list = properties.getProperty("kafka.broker.list")
 
   // kafka消费者配置
   var kafkaParam = collection.mutable.Map(
-    "bootstrap.servers" -> broker_list,//用于初始化链接到集群的地址
+    "bootstrap.servers" -> broker_list, //用于初始化链接到集群的地址
     "key.deserializer" -> classOf[StringDeserializer],
     "value.deserializer" -> classOf[StringDeserializer],
     //用于标识这个消费者属于哪个消费团体
@@ -29,23 +29,23 @@ object MyKafkaUtil {
 
 
   // 创建DStream，返回接收到的输入数据 从默认auto.offset位置读取数据
-  def getKafkaStream(topic: String,ssc:StreamingContext,groupId:String): InputDStream[ConsumerRecord[String,String]]={
-    kafkaParam("group.id")=groupId
-    val dStream = KafkaUtils.createDirectStream[String,String](
+  def getKafkaStream(topic: String, ssc: StreamingContext, groupId: String): InputDStream[ConsumerRecord[String, String]] = {
+    kafkaParam("group.id") = groupId
+    val dStream = KafkaUtils.createDirectStream[String, String](
       ssc,
       LocationStrategies.PreferConsistent,
-      ConsumerStrategies.Subscribe[String,String](Array(topic),kafkaParam ))
+      ConsumerStrategies.Subscribe[String, String](Array(topic), kafkaParam))
     dStream
   }
 
   // 创建DStream，返回接收到的输入数据 从指定偏移位置读取数据
-  def getKafkaStream(topic: String,ssc:StreamingContext,offsets:Map[TopicPartition,Long],groupId:String)
-  : InputDStream[ConsumerRecord[String,String]]={
-    kafkaParam("group.id")=groupId
-    val dStream = KafkaUtils.createDirectStream[String,String](
+  def getKafkaStream(topic: String, ssc: StreamingContext, offsets: Map[TopicPartition, Long], groupId: String)
+  : InputDStream[ConsumerRecord[String, String]] = {
+    kafkaParam("group.id") = groupId
+    val dStream = KafkaUtils.createDirectStream[String, String](
       ssc,
       LocationStrategies.PreferConsistent,
-      ConsumerStrategies.Subscribe[String,String](Array(topic),kafkaParam,offsets))
+      ConsumerStrategies.Subscribe[String, String](Array(topic), kafkaParam, offsets))
     dStream
   }
 }
